@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter_ai/data/gemini_api.dart';
 import 'package:flutter_ai/domain/entity/chat.dart';
+import 'package:flutter_ai/error/ai_exception.dart';
+import 'package:flutter_ai/presentation/bloc/chat_list_bloc.dart';
 import 'package:flutter_ai/theme/constants.dart';
 import 'package:flutter_ai/widgets/mark_down_text.dart';
+import 'package:flutter_ai/widgets/stream_loading_indicator.dart';
 import 'package:flutter_ai/widgets/vector_icon.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -14,17 +17,13 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  late final GeminiApi _api;
   late final TextEditingController _controller;
   late final ScrollController _scrollController;
-  late FocusScopeNode _focusScope;
-  final List<Chat> _chats = [];
-  bool _isStreaming = false;
+  late FocusScopeNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _api = GeminiApiImpl();
     _controller = TextEditingController();
     _scrollController = ScrollController();
   }
@@ -32,13 +31,14 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _focusScope = FocusScope.of(context);
+    _focusNode = FocusScope.of(context);
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -56,41 +56,38 @@ class _ChatPageState extends State<ChatPage> {
 
   void _onTapSend() {
     final text = _controller.text.trim();
-    if (text.isEmpty || _isStreaming) return;
+    if (text.isEmpty) return;
     _controller.clear();
-    _focusScope.unfocus();
+    _focusNode.unfocus();
 
     // Pass the current chats as history (before adding the new message)
-    final stream = _api.generateContent(_chats.toList(), text);
-
-    setState(() {
-      _chats.add(Chat.user(text));
-      _chats.add(Chat.ai(stream: stream));
-      _isStreaming = true;
-    });
+    context.read<ChatListBloc>().add(
+      ChatAdd(chat: Chat(text: text, isUser: true)),
+    );
 
     _scrollToBottom();
   }
 
-  void _onStreamDone() {
-    if (_isStreaming) {
-      setState(() {
-        _isStreaming = false;
-      });
-    }
+  void _addGeneratedChat(String text) {
+    debugPrint('ADD GENERATED CHAT CALLED: $text');
+    context.read<ChatListBloc>().add(ChatAdd(chat: Chat(text: text)));
+  }
+
+  void _removeLastUserMessage(String error) {
+    debugPrint('REMOVE LAST USER MESSAGE CALLED');
+    context.read<ChatListBloc>().add(ChatError(error));
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           onPressed: () {},
           icon: const VectorIcon(icon: AppIcons.menu),
         ),
-        title: const Text('Gyani AI'),
+        title: const Text('Gyani Ai'),
         actions: [
           IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert)),
         ],
@@ -98,58 +95,79 @@ class _ChatPageState extends State<ChatPage> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.only(
-                left: AppSpacing.m,
-                right: AppSpacing.m,
-                top: AppSpacing.s,
-                bottom: AppSpacing.xxxl,
-              ),
-              itemCount: _chats.length,
-              itemBuilder: (context, index) {
-                final message = _chats[index];
+            child: BlocBuilder<ChatListBloc, ChatListState>(
+              builder: (context, state) {
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(
+                    left: AppSpacing.m,
+                    right: AppSpacing.m,
+                    top: AppSpacing.s,
+                    bottom: AppSpacing.xxxl,
+                  ),
+                  itemCount: state.chats.length,
+                  itemBuilder: (context, index) {
+                    final message = state.chats[index];
+                    final isLastMessage = index == state.chats.length - 1;
 
-                if (message.isUser) {
-                  return ChatBubble(text: message.text);
-                }
-
-                // AI message — use StreamBuilder if stream is available
-                // and text is still empty (stream hasn't completed yet)
-                if (message.stream != null) {
-                  return _AiStreamingMessage(
-                    message: message,
-                    onStreamDone: _onStreamDone,
-                    onData: _scrollToBottom,
-                  );
-                }
-
-                // AI message with completed text
-                return index == _chats.length - 1
-                    ? Column(
+                    if (message.isUser && isLastMessage) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          MarkDownText(text: message.text),
-                          AppGaps.hM,
-                          Center(
-                            child: Text(
-                              'Generated by Gemini-2.5-flash model.',
-                              style: theme.textTheme.bodySmall,
+                          ChatBubble(text: message.text),
+                          // Stream result
+                          switch (state.responseStete) {
+                            // AI message — use StreamBuilder if stream is available
+                            // and text is still empty (stream hasn't completed yet)
+                            ResponseStreamming(:final stream) =>
+                              _AiStreamingMessage(
+                                stream: stream,
+                                onCompleteGenerate: _addGeneratedChat,
+                                onData: _scrollToBottom,
+                                onError: _removeLastUserMessage,
+                              ),
+                            ResponseError(:final error) => ErrorChatBubble(
+                              error: error,
                             ),
-                          ),
+                            _ => const SizedBox(),
+                          },
                         ],
-                      )
-                    : MarkDownText(text: message.text);
+                      );
+                    }
+
+                    // AI message with completed text
+                    if (message.isUser) {
+                      return ChatBubble(text: message.text);
+                    }
+
+                    return isLastMessage
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              MarkDownText(text: message.text),
+                              AppGaps.hM,
+                              Center(
+                                child: Text(
+                                  'Generated by Gemini-2.5-flash model.',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ),
+                            ],
+                          )
+                        : MarkDownText(text: message.text);
+                  },
+                );
               },
             ),
           ),
           // Prompt Edition Panel
           SafeArea(
             top: false,
-            child: PromptEditionPanel(
+            child: PromptEditingPanel(
               controller: _controller,
               onTapSend: _onTapSend,
-              isSendEnabled: !_isStreaming,
             ),
           ),
         ],
@@ -158,80 +176,71 @@ class _ChatPageState extends State<ChatPage> {
   }
 }
 
-/// Displays an AI message that is currently streaming.
-class _AiStreamingMessage extends StatelessWidget {
-  const _AiStreamingMessage({
-    required this.message,
-    required this.onStreamDone,
-    required this.onData,
-  });
+class ErrorChatBubble extends StatelessWidget {
+  const ErrorChatBubble({super.key, required this.error});
 
-  final Chat message;
-  final VoidCallback onStreamDone;
-  final VoidCallback onData;
+  final String error;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: const BorderRadius.all(AppRadius.l),
+        border: Border.all(color: colorScheme.error.withAlpha(128)),
+      ),
+      child: MarkDownText(text: error),
+    );
+  }
+}
 
+/// Displays an AI message that is currently streaming.
+class _AiStreamingMessage extends StatelessWidget {
+  const _AiStreamingMessage({
+    required this.stream,
+    required this.onCompleteGenerate,
+    required this.onData,
+    required this.onError,
+  });
+
+  final Stream<String>? stream;
+  final void Function(String) onCompleteGenerate;
+  final VoidCallback onData;
+  final void Function(String) onError;
+
+  @override
+  Widget build(BuildContext context) {
     return StreamBuilder<String>(
-      stream: message.stream,
+      stream: stream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: AppSpacing.m,
-                  height: AppSpacing.m,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                AppGaps.wS,
-                Text(
-                  'Thinking...',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          SchedulerBinding.instance.addPostFrameCallback((_) => onStreamDone());
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
-            child: Text(
-              'Error: ${snapshot.error}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-          );
-        }
-
         // Update the message text as data comes in
-        if (snapshot.hasData) {
-          // message.text = snapshot.data!;
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          SchedulerBinding.instance.addPostFrameCallback(
+            (_) => onCompleteGenerate(snapshot.data!),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const StreamLoadingIndicator(key: ValueKey('loading'));
+        } else if (snapshot.hasError) {
+          final error = snapshot.error as AiException;
+          SchedulerBinding.instance.addPostFrameCallback(
+            (_) => onError(error.message),
+          );
+          return ErrorChatBubble(
+            key: const ValueKey('error'),
+            error: error.message,
+          );
+        } else {
           SchedulerBinding.instance.addPostFrameCallback((_) => onData());
+          return MarkDownText(
+            key: const ValueKey('content'),
+            text: snapshot.data!,
+          );
         }
-
-        // Stream completed — persist the final text
-        if (snapshot.connectionState == ConnectionState.done) {
-          message.setText(snapshot.data!);
-          SchedulerBinding.instance.addPostFrameCallback((_) => onStreamDone());
-        }
-
-        if (message.text.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return MarkDownText(text: message.text);
       },
     );
   }
@@ -254,8 +263,8 @@ class ChatBubble extends StatelessWidget {
           vertical: AppSpacing.m,
         ),
         margin: const EdgeInsets.only(
-          bottom: AppSpacing.m,
-          top: AppSpacing.m,
+          bottom: AppSpacing.l,
+          top: AppSpacing.l,
           left: AppSpacing.xxxl,
         ),
         decoration: BoxDecoration(
@@ -273,17 +282,15 @@ class ChatBubble extends StatelessWidget {
   }
 }
 
-class PromptEditionPanel extends StatelessWidget {
-  PromptEditionPanel({
+class PromptEditingPanel extends StatelessWidget {
+  PromptEditingPanel({
     super.key,
     required this.controller,
     required this.onTapSend,
-    this.isSendEnabled = true,
   }) : _isEditing = ValueNotifier<bool>(false);
 
   final TextEditingController controller;
   final VoidCallback onTapSend;
-  final bool isSendEnabled;
   final ValueNotifier<bool> _isEditing;
 
   @override
@@ -350,7 +357,7 @@ class PromptEditionPanel extends StatelessWidget {
                     child: value
                         ? IconButton(
                             key: const ValueKey('send'),
-                            onPressed: isSendEnabled ? onTapSend : null,
+                            onPressed: onTapSend,
                             icon: const VectorIcon(icon: AppIcons.send),
                             style: IconButton.styleFrom(
                               fixedSize: const Size.square(48),

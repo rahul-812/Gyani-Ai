@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_ai/theme/constants.dart';
 
 class AppTheme {
   static ColorScheme get _lightColorScheme => const ColorScheme.light(
@@ -15,6 +14,8 @@ class AppTheme {
     surfaceContainer: Color(0xFFFFFFFF),
     outline: Color(0xFFD9D9D9),
     outlineVariant: Color(0xFFE9EAE9),
+    error: Color(0xFFD2463F),
+    errorContainer: Color(0xFFFFE9E7),
   );
 
   static ColorScheme get _darkColorScheme => const ColorScheme.dark(
@@ -29,6 +30,8 @@ class AppTheme {
     surfaceContainer: Color(0xFF282A2C),
     outline: Color(0xFF74777F),
     outlineVariant: Color(0xFF3A3B3D),
+    error: Color(0xFFA64D47),
+    errorContainer: Color(0xFF3A221F),
   );
 
   static ThemeData get light => theme(_lightColorScheme);
@@ -36,10 +39,10 @@ class AppTheme {
 
   static ThemeData theme(ColorScheme colorScheme) {
     final baseBodyLargeTextTheme = const TextStyle(
-      fontFamily: 'Google Sans',
+      fontFamily: 'Inter',
       fontWeight: FontWeight.w400,
-      letterSpacing: 0.25,
-      height: 1.5,
+      letterSpacing: 0,
+      // height: 1.5,
     );
 
     return ThemeData(
@@ -75,9 +78,9 @@ class AppTheme {
           fontSize: 20,
         ),
         bodyLarge: baseBodyLargeTextTheme,
-        bodyMedium: const TextStyle(fontFamily: 'Google Sans'),
+        bodyMedium: const TextStyle(fontFamily: 'Inter'),
         bodySmall: TextStyle(
-          fontFamily: 'Google Sans',
+          fontFamily: 'Inter',
           color: colorScheme.onSurfaceVariant,
         ),
       ),
@@ -92,29 +95,6 @@ class AppTheme {
         hintFadeDuration: const Duration(milliseconds: 600),
         hintStyle: baseBodyLargeTextTheme.copyWith(
           color: colorScheme.onSurfaceVariant,
-        ),
-      ),
-
-      // Elevated Button Theme
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ButtonStyle(
-          padding: const WidgetStatePropertyAll<EdgeInsetsGeometry>(
-            AppPadding.verticalM,
-          ),
-          backgroundColor: WidgetStatePropertyAll<Color>(colorScheme.primary),
-          foregroundColor: WidgetStatePropertyAll<Color>(colorScheme.onPrimary),
-          shape: const WidgetStatePropertyAll<RoundedRectangleBorder>(
-            RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(AppRadius.s),
-            ),
-          ),
-          textStyle: const WidgetStatePropertyAll<TextStyle?>(
-            TextStyle(
-              fontFamily: 'Google Sans',
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
         ),
       ),
     );

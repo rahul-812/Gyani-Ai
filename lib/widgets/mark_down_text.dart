@@ -4,26 +4,32 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 class MarkDownText extends StatelessWidget {
-  const MarkDownText({super.key, required this.text, this.padding});
+  const MarkDownText({super.key, required this.text});
 
   final String text;
-  final EdgeInsets? padding;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textStyle = theme.textTheme.bodyLarge!;
 
-    return MarkdownBody(
+    return SelectionArea(
+      child: MarkdownBody(
       builders: {'code': CodeElementBuilder()},
       shrinkWrap: true,
       data: text,
       extensionSet: md.ExtensionSet.gitHubFlavored,
-      selectable: true,
       bulletBuilder: (bulletParameter) {
+        if (bulletParameter.style == BulletStyle.orderedList) {
+          return Text(
+            '${bulletParameter.index + 1}.',
+            style: textStyle.copyWith(fontWeight: FontWeight.w600),
+          );
+        }
         return Icon(
           bulletParameter.nestLevel == 0 ? Icons.circle_outlined : Icons.circle,
-          size: 10,
+          size: 8.0,
+          fontWeight: FontWeight.w900,
         );
       },
       styleSheet: MarkdownStyleSheet(
@@ -69,18 +75,22 @@ class MarkDownText extends StatelessWidget {
         tableBorder: TableBorder.all(
           color: theme.colorScheme.outlineVariant,
           width: 1,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
         ),
         tableCellsPadding: const EdgeInsets.symmetric(
           horizontal: 12,
-          vertical: 8,
+          vertical: 12,
         ),
-        tableCellsDecoration: BoxDecoration(color: theme.colorScheme.surface),
+        tableCellsDecoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+        ),
         blockquotePadding: const EdgeInsets.only(left: 16, top: 4, bottom: 4),
         pPadding: const EdgeInsets.symmetric(vertical: 8),
         h1Padding: const EdgeInsets.only(top: 24, bottom: 8),
         h2Padding: const EdgeInsets.only(top: 20, bottom: 8),
         h3Padding: const EdgeInsets.only(top: 16, bottom: 8),
-        listBulletPadding: const EdgeInsets.only(right: 8, top: 4),
+        listBulletPadding: const EdgeInsets.only(right: 4, top: 4),
+      ),
       ),
     );
   }

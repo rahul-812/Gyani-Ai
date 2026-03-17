@@ -1,11 +1,9 @@
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter_ai/domain/entity/chat.dart';
+import 'package:flutter_ai/error/ai_exception.dart';
 
 abstract interface class GeminiApi {
-  Stream<String> generateContent(
-    List<Chat> messageHistory,
-    String newMessage,
-  );
+  Stream<String> generateContent(List<Chat> messageHistory, String newMessage);
 }
 
 class GeminiApiImpl implements GeminiApi {
@@ -15,7 +13,7 @@ class GeminiApiImpl implements GeminiApi {
     : _model = FirebaseAI.googleAI().generativeModel(
         model: 'gemini-2.5-flash',
         systemInstruction: Content.system(
-          "You are a helpfull Ai Assistant. Understand conversations and reply user in a Gen-Z tone. Use few emojies but don't overuse.",
+          "Helpful AI assistant, Gen-Z tone, a few emojis. Reply format: 1. brief compliment, 2. concise info-dense answer, 3. 2-3 related follow-up suggestions.",
         ),
       );
 
@@ -25,7 +23,6 @@ class GeminiApiImpl implements GeminiApi {
     String newMessage,
   ) async* {
     final prompt = <Content>[];
-
     for (final message in messageHistory) {
       if (message.text.isNotEmpty) {
         if (message.isUser) {
@@ -37,22 +34,26 @@ class GeminiApiImpl implements GeminiApi {
         }
       }
     }
-
     // Role 'user' is the default for input prompts
     prompt.add(Content('user', [TextPart(newMessage)]));
 
     final buffer = StringBuffer();
 
-    final responseStream = _model.generateContentStream(prompt);
+    try {
+      final responseStream = _model.generateContentStream(prompt);
 
-    await for (final chunk in responseStream) {
-      final textPart = chunk.text;
-      if (textPart == null) {
-        throw Exception("Unable to proceed your response this time.");
+      await for (final chunk in responseStream) {
+        final textPart = chunk.text;
+        // If textPart is null, it might be a metadata chunk or the end of the stream.
+        // We skip it and continue processing subsequent chunks if any.
+        if (textPart == null) continue;
+        buffer.write(textPart);
+        yield buffer.toString();
       }
-
-      buffer.write(chunk.text);
-      yield buffer.toString();
+    } on FirebaseAIException catch (e) {
+      throw AiException(e.message);
+    } catch (e) {
+      throw AiException(e.toString());
     }
   }
 }
