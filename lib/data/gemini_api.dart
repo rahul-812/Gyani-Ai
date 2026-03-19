@@ -13,7 +13,7 @@ class GeminiApiImpl implements GeminiApi {
     : _model = FirebaseAI.googleAI().generativeModel(
         model: 'gemini-2.5-flash',
         systemInstruction: Content.system(
-          "Helpful AI assistant, Gen-Z tone, a few emojis. Reply format: 1. brief compliment, 2. concise info-dense answer, 3. 2-3 related follow-up suggestions.",
+          "Helpful AI assistant named 'Gyani Ai', use Gen-Z tone, a few emojis. Reply format: 1. brief compliment, 2. concise info-dense answer, 3. 2-3 related follow-up suggestions.",
         ),
       );
 

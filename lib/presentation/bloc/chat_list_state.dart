@@ -24,27 +24,6 @@ final class ResponseError extends ResponseState {
   const ResponseError(this.error);
 }
 
-// @immutable
-// class ChatListState {
-//   final List<Chat> chats;
-//   final Stream<String>? stream;
-
-//   const ChatListState({this.chats = const [], this.stream});
-
-//   ChatListState copyWith({
-//     List<Chat>? chats,
-//     Stream<String>? stream,
-//     bool clearStream = false, // 👈 Add this flag
-//   }) {
-//     return ChatListState(
-//       chats: chats ?? this.chats,
-//       stream: clearStream ? null : (stream ?? this.stream),
-//     );
-//   }
-
-//   bool get isStreamming => stream != null;
-// }
-
 @immutable
 class ChatListState {
   final List<Chat> chats;

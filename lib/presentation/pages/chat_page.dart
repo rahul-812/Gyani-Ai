@@ -276,7 +276,7 @@ class ChatBubble extends StatelessWidget {
             bottomRight: AppRadius.xl,
           ),
         ),
-        child: Text(text, style: theme.textTheme.bodyLarge),
+        child: SelectableText(text, style: theme.textTheme.bodyLarge),
       ),
     );
   }

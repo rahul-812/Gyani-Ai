@@ -36,22 +36,6 @@ class ChatListBloc extends Bloc<ChatEvent, ChatListState> {
         );
       }
     });
-    // ChatListBloc(this._api) : super(const ChatListState()) {
-    //   on<ChatListAdd>((event, emit) {
-    //     final newChat = event.chat;
-    //     final updatedChats = [...state.chats, newChat];
-
-    //     if (newChat.isUser) {
-    //       final stream = _api.generateContent(
-    //         state.chats,
-    //         newChat.text,
-    //       );
-
-    //       emit(state.copyWith(chats: updatedChats, stream: stream));
-    //     } else {
-    //       emit(state.copyWith(chats: updatedChats, clearStream: true));
-    //     }
-    //   });
 
     on<ChatError>((event, emit) {
       emit(

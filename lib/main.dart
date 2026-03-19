@@ -1,8 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_ai/data/gemini_api.dart';
 import 'package:flutter_ai/firebase_options.dart';
+import 'package:flutter_ai/presentation/bloc/chat_list_bloc.dart';
 import 'package:flutter_ai/presentation/pages/chat_page.dart';
 import 'package:flutter_ai/theme/theme.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +23,10 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       title: "Gyani Ai",
-      home: const ChatPage(),
+      home: BlocProvider(
+        create: (context) => ChatListBloc(GeminiApiImpl()),
+        child: const ChatPage(),
+      ),
     );
   }
 }
